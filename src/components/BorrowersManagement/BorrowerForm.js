@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { db } from '../../firebase/firebaseConfig';
-import { collection, addDoc, doc, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Dialog, DialogTitle, DialogContent, TextField, DialogActions, Button, Autocomplete, Snackbar, Alert } from '@mui/material';
+import { getAuth } from 'firebase/auth';
 
 const BorrowerForm = ({ open, setOpen, fetchBorrowers, borrower, books }) => {
   const [name, setName] = useState(borrower?.name || '');
@@ -10,28 +11,34 @@ const BorrowerForm = ({ open, setOpen, fetchBorrowers, borrower, books }) => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+  const auth = getAuth();
+  const user = auth.currentUser;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Check if borrower with the same name already exists
-    const borrowersSnapshot = await getDocs(collection(db, 'Borrowers'));
-    const existingBorrower = borrowersSnapshot.docs.find(doc => doc.data().name === name);
-
-    if (existingBorrower && !borrower) {
-      setSnackbarMessage('Borrower with the same name already exists!');
+    if (!user) {
+      setSnackbarMessage('You must be logged in to add a borrower.');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
       return;
     }
 
-    const borrowerData = { name, borrowedBooks: borrowedBooks.map(book => book.id), borrowDate };
+    const borrowerData = {
+      name,
+      borrowedBooks: borrowedBooks.map(book => book.id),
+      borrowDate: serverTimestamp(),
+    };
+
     try {
       if (borrower) {
-        await updateDoc(doc(db, 'Borrowers', borrower.id), borrowerData);
+        // Update existing borrower
+        await updateDoc(doc(db, 'Users', user.uid, 'borrowers', borrower.id), borrowerData);
         setSnackbarMessage('Borrower updated successfully!');
       } else {
-        await addDoc(collection(db, 'Borrowers'), borrowerData);
+        // Add new borrower
+        const userBorrowersRef = collection(db, 'Users', user.uid, 'borrowers');
+        await addDoc(userBorrowersRef, borrowerData);
         setSnackbarMessage('Borrower added successfully!');
       }
       setSnackbarSeverity('success');
@@ -72,7 +79,7 @@ const BorrowerForm = ({ open, setOpen, fetchBorrowers, borrower, books }) => {
           <Autocomplete
             multiple
             options={books.filter(book => !book.borrowerId)}
-            getOptionLabel={(book) => book.name}
+            getOptionLabel={(book) => book.title}
             value={books.filter(book => borrowedBooks.includes(book.id))}
             onChange={(e, value) => setBorrowedBooks(value)}
             renderInput={(params) => <TextField {...params} label="Borrowed Books" />}
