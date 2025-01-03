@@ -1,38 +1,47 @@
 import React, { useState } from 'react';
 import { db } from '../../firebase/firebaseConfig';
-import { collection, addDoc, doc, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, getDocs, serverTimestamp } from 'firebase/firestore';
 import { Dialog, DialogTitle, DialogContent, TextField, DialogActions, Button, MenuItem, Select, InputLabel, FormControl, Snackbar, Alert } from '@mui/material';
+import { getAuth } from 'firebase/auth';
 
 const BookForm = ({ open, setOpen, fetchBooks, book }) => {
-  const [name, setName] = useState(book?.name || '');
+  const [title, setTitle] = useState(book?.title || '');
   const [author, setAuthor] = useState(book?.author || '');
   const [category, setCategory] = useState(book?.category || []);
-  const [addDate, setAddDate] = useState(book?.addDate || new Date());
+  const [collectionName, setCollectionName] = useState(book?.collection || '');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+  const auth = getAuth();
+  const user = auth.currentUser;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Check if a book with the same name already exists
-    const booksSnapshot = await getDocs(collection(db, 'Books'));
-    const existingBook = booksSnapshot.docs.find(doc => doc.data().name === name);
-
-    if (existingBook && !book) {
-      setSnackbarMessage('A book with the same name already exists!');
+    if (!user) {
+      setSnackbarMessage('You must be logged in to add a book.');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
       return;
     }
 
-    const bookData = { name, author, category, addDate };
+    const bookData = {
+      title,
+      author,
+      category,
+      collection: collectionName,
+      addDate: serverTimestamp(),
+    };
+
     try {
       if (book) {
-        await updateDoc(doc(db, 'Books', book.id), bookData);
+        // Update existing book
+        await updateDoc(doc(db, 'Users', user.uid, 'books', book.id), bookData);
         setSnackbarMessage('Book updated successfully!');
       } else {
-        await addDoc(collection(db, 'Books'), bookData);
+        // Add new book
+        const userBooksRef = collection(db, 'Users', user.uid, 'books');
+        await addDoc(userBooksRef, bookData);
         setSnackbarMessage('Book added successfully!');
       }
       setSnackbarSeverity('success');
@@ -55,9 +64,9 @@ const BookForm = ({ open, setOpen, fetchBooks, book }) => {
         <DialogTitle>{book ? 'Edit Book' : 'Add Book'}</DialogTitle>
         <DialogContent>
           <TextField
-            label="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            label="Title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             fullWidth
             margin="normal"
           />
@@ -82,13 +91,11 @@ const BookForm = ({ open, setOpen, fetchBooks, book }) => {
             </Select>
           </FormControl>
           <TextField
-            label="Add Date"
-            type="date"
-            value={addDate.toISOString().split('T')[0]}
-            onChange={(e) => setAddDate(new Date(e.target.value))}
+            label="Collection"
+            value={collectionName}
+            onChange={(e) => setCollectionName(e.target.value)}
             fullWidth
             margin="normal"
-            InputLabelProps={{ shrink: true }}
           />
         </DialogContent>
         <DialogActions>
