@@ -1,0 +1,31 @@
+/* BooksManagement.css */
+.books-management {
+    padding: 2rem;
+  }
+  
+  .books-management h1 {
+    margin-bottom: 1rem;
+  }
+  
+  .book-card {
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .book-card h2 {
+    margin-bottom: 0.5rem;
+  }
+  
+  /* Media Queries for Responsiveness */
+  @media (max-width: 768px) {
+    .books-management {
+      padding: 1rem;
+    }
+  
+    .book-card {
+      padding: 0.5rem;
+    }
+  }

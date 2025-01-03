@@ -1,0 +1,31 @@
+/* Sidebar.css */
+.sidebar {
+    width: 250px;
+    height: 100vh;
+    background-color: #f5f5f5;
+    padding: 1rem;
+  }
+  
+  .sidebar a {
+    text-decoration: none;
+    color: #1976d2;
+    display: block;
+    margin: 1rem 0;
+  }
+  
+  .sidebar a:hover {
+    color: #115293;
+  }
+  
+  /* Media Queries for Responsiveness */
+  @media (max-width: 768px) {
+    .sidebar {
+      width: 100%;
+      height: auto;
+      padding: 0.5rem;
+    }
+  
+    .sidebar a {
+      margin: 0.5rem 0;
+    }
+  }

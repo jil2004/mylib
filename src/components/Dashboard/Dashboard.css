@@ -1,0 +1,31 @@
+/* Dashboard.css */
+.dashboard {
+    padding: 2rem;
+  }
+  
+  .dashboard h1 {
+    margin-bottom: 1rem;
+  }
+  
+  .card {
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .card h2 {
+    margin-bottom: 0.5rem;
+  }
+  
+  /* Media Queries for Responsiveness */
+  @media (max-width: 768px) {
+    .dashboard {
+      padding: 1rem;
+    }
+  
+    .card {
+      padding: 0.5rem;
+    }
+  }
