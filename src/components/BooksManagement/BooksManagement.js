@@ -1,7 +1,8 @@
+// src/components/BooksManagement.js
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/firebaseConfig';
 import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
-import { Button, Typography, Box, TextField, List, ListItem, ListItemText, Divider, IconButton, Card } from '@mui/material';
+import { Button, Typography, Box, TextField, List, ListItem, ListItemText, Divider, IconButton, Card, CircularProgress } from '@mui/material';
 import BookForm from './BookForm';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -12,16 +13,24 @@ const BooksManagement = () => {
   const [open, setOpen] = useState(false);
   const [selectedBook, setSelectedBook] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchBooks();
   }, []);
 
   const fetchBooks = async () => {
-    const booksSnapshot = await getDocs(collection(db, 'Books'));
-    const booksData = booksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    setBooks(booksData);
-    setFilteredBooks(booksData);
+    setLoading(true);
+    try {
+      const booksSnapshot = await getDocs(collection(db, 'Books'));
+      const booksData = booksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setBooks(booksData);
+      setFilteredBooks(booksData);
+    } catch (error) {
+      console.error('Error fetching books:', error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSearch = (e) => {
@@ -35,8 +44,12 @@ const BooksManagement = () => {
   };
 
   const handleDelete = async (id) => {
-    await deleteDoc(doc(db, 'Books', id));
-    fetchBooks();
+    try {
+      await deleteDoc(doc(db, 'Books', id));
+      fetchBooks();
+    } catch (error) {
+      console.error('Error deleting book:', error.message);
+    }
   };
 
   return (
@@ -53,25 +66,29 @@ const BooksManagement = () => {
         <Button variant="contained" onClick={() => { setSelectedBook(null); setOpen(true); }}>Add Book</Button>
       </Box>
       <Card sx={{ borderRadius: 2, boxShadow: 3 }}>
-        <List>
-          {filteredBooks.map((book, index) => (
-            <React.Fragment key={book.id}>
-              <ListItem>
-                <ListItemText
-                  primary={book.name}
-                  secondary={`Author: ${book.author} | Categories: ${book.category?.join(', ') || 'No categories'} | Added: ${book.addDate?.toDate().toLocaleDateString()}`}
-                />
-                <IconButton onClick={() => { setSelectedBook(book); setOpen(true); }}>
-                  <EditIcon />
-                </IconButton>
-                <IconButton onClick={() => handleDelete(book.id)}>
-                  <DeleteIcon />
-                </IconButton>
-              </ListItem>
-              {index < filteredBooks.length - 1 && <Divider />}
-            </React.Fragment>
-          ))}
-        </List>
+        {loading ? (
+          <CircularProgress sx={{ display: 'block', margin: '20px auto' }} />
+        ) : (
+          <List>
+            {filteredBooks.map((book, index) => (
+              <React.Fragment key={book.id}>
+                <ListItem>
+                  <ListItemText
+                    primary={book.name}
+                    secondary={`Author: ${book.author} | Categories: ${book.category?.join(', ') || 'No categories'} | Added: ${book.addDate?.toDate().toLocaleDateString()}`}
+                  />
+                  <IconButton onClick={() => { setSelectedBook(book); setOpen(true); }}>
+                    <EditIcon />
+                  </IconButton>
+                  <IconButton onClick={() => handleDelete(book.id)}>
+                    <DeleteIcon />
+                  </IconButton>
+                </ListItem>
+                {index < filteredBooks.length - 1 && <Divider />}
+              </React.Fragment>
+            ))}
+          </List>
+        )}
       </Card>
       <BookForm open={open} setOpen={setOpen} fetchBooks={fetchBooks} book={selectedBook} />
     </Box>
