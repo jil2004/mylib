@@ -1,8 +1,10 @@
+// src/components/BorrowerForm.js
 import React, { useState } from 'react';
 import { db } from '../../firebase/firebaseConfig';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { Dialog, DialogTitle, DialogContent, TextField, DialogActions, Button, Autocomplete, Snackbar, Alert } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, TextField, DialogActions, Button, Autocomplete, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { getAuth } from 'firebase/auth';
+import { addLog } from '../../utils/firebaseUtils';
 
 const BorrowerForm = ({ open, setOpen, fetchBorrowers, borrower, books }) => {
   const [name, setName] = useState(borrower?.name || '');
@@ -11,6 +13,7 @@ const BorrowerForm = ({ open, setOpen, fetchBorrowers, borrower, books }) => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+  const [loading, setLoading] = useState(false);
   const auth = getAuth();
   const user = auth.currentUser;
 
@@ -30,6 +33,7 @@ const BorrowerForm = ({ open, setOpen, fetchBorrowers, borrower, books }) => {
       borrowDate: serverTimestamp(),
     };
 
+    setLoading(true);
     try {
       if (borrower) {
         // Update existing borrower
@@ -47,37 +51,17 @@ const BorrowerForm = ({ open, setOpen, fetchBorrowers, borrower, books }) => {
       fetchBorrowers();
       setOpen(false);
     } catch (error) {
-      setSnackbarMessage('An error occurred. Please try again.');
+      console.error('Error:', error.message);
+      setSnackbarMessage(error.message || 'An error occurred. Please try again.');
       setSnackbarSeverity('error');
+    } finally {
+      setLoading(false);
+      setSnackbarOpen(true);
     }
-    setSnackbarOpen(true);
   };
 
   const handleCloseSnackbar = () => {
     setSnackbarOpen(false);
-  };
-
-  const addLog = async (type, bookID, borrowerID, details) => {
-    if (!user) {
-      console.error('User not logged in.');
-      return;
-    }
-
-    const logData = {
-      type,
-      bookID,
-      borrowerID,
-      timestamp: serverTimestamp(),
-      details,
-    };
-
-    try {
-      const logsRef = collection(db, 'Logs');
-      await addDoc(logsRef, logData);
-      console.log('Log added successfully!');
-    } catch (error) {
-      console.error('Error adding log:', error.message);
-    }
   };
 
   return (
@@ -112,7 +96,9 @@ const BorrowerForm = ({ open, setOpen, fetchBorrowers, borrower, books }) => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained">Save</Button>
+          <Button onClick={handleSubmit} variant="contained" disabled={loading}>
+            {loading ? <CircularProgress size={24} /> : 'Save'}
+          </Button>
         </DialogActions>
       </Dialog>
       <Snackbar
