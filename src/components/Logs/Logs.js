@@ -1,61 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../../firebase/firebaseConfig';
-import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Box, Typography, Card, CardContent, TextField, List, ListItem, ListItemText, Divider, Button } from '@mui/material';
-import { getAuth } from 'firebase/auth';
+import { collection, getDocs } from 'firebase/firestore';
+import { Box, Typography, Card, CardContent, TextField, List, ListItem, ListItemText, Divider, CircularProgress } from '@mui/material';
 
 const Logs = () => {
   const [logs, setLogs] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const auth = getAuth();
-  const user = auth.currentUser;
+  const [loading, setLoading] = useState(false);
 
-  // Fetch logs from Firestore
   useEffect(() => {
     fetchLogs();
   }, []);
 
   const fetchLogs = async () => {
+    setLoading(true);
     try {
       const logsSnapshot = await getDocs(collection(db, 'Logs'));
       const logsData = logsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setLogs(logsData);
     } catch (error) {
       console.error('Error fetching logs:', error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Add a log to Firestore
-  const addLog = async (type, bookID, borrowerID, details) => {
-    if (!user) {
-      console.error('User not logged in.');
-      return;
-    }
-
-    const logData = {
-      type,
-      bookID,
-      borrowerID,
-      timestamp: serverTimestamp(),
-      details,
-    };
-
-    try {
-      const logsRef = collection(db, 'Logs');
-      await addDoc(logsRef, logData);
-      console.log('Log added successfully!');
-    } catch (error) {
-      console.error('Error adding log:', error.message);
-    }
-  };
-
-  // Example usage of addLog
-  const handleAddLog = async () => {
-    await addLog('TEST_LOG', null, null, 'This is a test log.');
-    fetchLogs(); // Refresh logs after adding a new one
-  };
-
-  // Filter logs based on search term
   const handleSearch = (e) => {
     setSearchTerm(e.target.value.toLowerCase());
   };
@@ -74,23 +43,24 @@ const Logs = () => {
         onChange={handleSearch}
         sx={{ width: '300px', mb: 3 }}
       />
-      <Button variant="contained" onClick={handleAddLog} sx={{ mb: 3 }}>
-        Add Test Log
-      </Button>
       <Card sx={{ borderRadius: 2, boxShadow: 3 }}>
-        <List>
-          {filteredLogs.map((log, index) => (
-            <React.Fragment key={log.id}>
-              <ListItem>
-                <ListItemText
-                  primary={log.details}
-                  secondary={`Type: ${log.type} | Timestamp: ${log.timestamp?.toDate().toLocaleString()}`}
-                />
-              </ListItem>
-              {index < filteredLogs.length - 1 && <Divider />}
-            </React.Fragment>
-          ))}
-        </List>
+        {loading ? (
+          <CircularProgress sx={{ display: 'block', margin: '20px auto' }} />
+        ) : (
+          <List>
+            {filteredLogs.map((log, index) => (
+              <React.Fragment key={log.id}>
+                <ListItem>
+                  <ListItemText
+                    primary={log.details}
+                    secondary={`Type: ${log.type} | Timestamp: ${log.timestamp?.toDate().toLocaleString()}`}
+                  />
+                </ListItem>
+                {index < filteredLogs.length - 1 && <Divider />}
+              </React.Fragment>
+            ))}
+          </List>
+        )}
       </Card>
     </Box>
   );
