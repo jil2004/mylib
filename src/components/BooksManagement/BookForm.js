@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { db } from '../../firebase/firebaseConfig';
-import { collection, addDoc, doc, updateDoc, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Dialog, DialogTitle, DialogContent, TextField, DialogActions, Button, MenuItem, Select, InputLabel, FormControl, Snackbar, Alert } from '@mui/material';
 import { getAuth } from 'firebase/auth';
 
@@ -38,11 +38,13 @@ const BookForm = ({ open, setOpen, fetchBooks, book }) => {
         // Update existing book
         await updateDoc(doc(db, 'Users', user.uid, 'books', book.id), bookData);
         setSnackbarMessage('Book updated successfully!');
+        await addLog('UPDATE_BOOK', book.id, null, `Updated book "${title}" by ${author}`);
       } else {
         // Add new book
         const userBooksRef = collection(db, 'Users', user.uid, 'books');
-        await addDoc(userBooksRef, bookData);
+        const newBookRef = await addDoc(userBooksRef, bookData);
         setSnackbarMessage('Book added successfully!');
+        await addLog('ADD_BOOK', newBookRef.id, null, `Added book "${title}" by ${author}`);
       }
       setSnackbarSeverity('success');
       fetchBooks();
@@ -56,6 +58,29 @@ const BookForm = ({ open, setOpen, fetchBooks, book }) => {
 
   const handleCloseSnackbar = () => {
     setSnackbarOpen(false);
+  };
+
+  const addLog = async (type, bookID, borrowerID, details) => {
+    if (!user) {
+      console.error('User not logged in.');
+      return;
+    }
+
+    const logData = {
+      type,
+      bookID,
+      borrowerID,
+      timestamp: serverTimestamp(),
+      details,
+    };
+
+    try {
+      const logsRef = collection(db, 'Logs');
+      await addDoc(logsRef, logData);
+      console.log('Log added successfully!');
+    } catch (error) {
+      console.error('Error adding log:', error.message);
+    }
   };
 
   return (

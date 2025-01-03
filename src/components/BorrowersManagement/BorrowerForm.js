@@ -35,11 +35,13 @@ const BorrowerForm = ({ open, setOpen, fetchBorrowers, borrower, books }) => {
         // Update existing borrower
         await updateDoc(doc(db, 'Users', user.uid, 'borrowers', borrower.id), borrowerData);
         setSnackbarMessage('Borrower updated successfully!');
+        await addLog('UPDATE_BORROWER', null, borrower.id, `Updated borrower "${name}"`);
       } else {
         // Add new borrower
         const userBorrowersRef = collection(db, 'Users', user.uid, 'borrowers');
-        await addDoc(userBorrowersRef, borrowerData);
+        const newBorrowerRef = await addDoc(userBorrowersRef, borrowerData);
         setSnackbarMessage('Borrower added successfully!');
+        await addLog('ADD_BORROWER', null, newBorrowerRef.id, `Added borrower "${name}"`);
       }
       setSnackbarSeverity('success');
       fetchBorrowers();
@@ -53,6 +55,29 @@ const BorrowerForm = ({ open, setOpen, fetchBorrowers, borrower, books }) => {
 
   const handleCloseSnackbar = () => {
     setSnackbarOpen(false);
+  };
+
+  const addLog = async (type, bookID, borrowerID, details) => {
+    if (!user) {
+      console.error('User not logged in.');
+      return;
+    }
+
+    const logData = {
+      type,
+      bookID,
+      borrowerID,
+      timestamp: serverTimestamp(),
+      details,
+    };
+
+    try {
+      const logsRef = collection(db, 'Logs');
+      await addDoc(logsRef, logData);
+      console.log('Log added successfully!');
+    } catch (error) {
+      console.error('Error adding log:', error.message);
+    }
   };
 
   return (
