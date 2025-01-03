@@ -1,8 +1,10 @@
+// src/components/BookForm.js
 import React, { useState } from 'react';
 import { db } from '../../firebase/firebaseConfig';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { Dialog, DialogTitle, DialogContent, TextField, DialogActions, Button, MenuItem, Select, InputLabel, FormControl, Snackbar, Alert } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, TextField, DialogActions, Button, MenuItem, Select, InputLabel, FormControl, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { getAuth } from 'firebase/auth';
+import { addLog } from '../../utils/firebaseUtils';
 
 const BookForm = ({ open, setOpen, fetchBooks, book }) => {
   const [title, setTitle] = useState(book?.title || '');
@@ -12,6 +14,7 @@ const BookForm = ({ open, setOpen, fetchBooks, book }) => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+  const [loading, setLoading] = useState(false);
   const auth = getAuth();
   const user = auth.currentUser;
 
@@ -33,6 +36,7 @@ const BookForm = ({ open, setOpen, fetchBooks, book }) => {
       addDate: serverTimestamp(),
     };
 
+    setLoading(true);
     try {
       if (book) {
         // Update existing book
@@ -50,37 +54,17 @@ const BookForm = ({ open, setOpen, fetchBooks, book }) => {
       fetchBooks();
       setOpen(false);
     } catch (error) {
-      setSnackbarMessage('An error occurred. Please try again.');
+      console.error('Error:', error.message);
+      setSnackbarMessage(error.message || 'An error occurred. Please try again.');
       setSnackbarSeverity('error');
+    } finally {
+      setLoading(false);
+      setSnackbarOpen(true);
     }
-    setSnackbarOpen(true);
   };
 
   const handleCloseSnackbar = () => {
     setSnackbarOpen(false);
-  };
-
-  const addLog = async (type, bookID, borrowerID, details) => {
-    if (!user) {
-      console.error('User not logged in.');
-      return;
-    }
-
-    const logData = {
-      type,
-      bookID,
-      borrowerID,
-      timestamp: serverTimestamp(),
-      details,
-    };
-
-    try {
-      const logsRef = collection(db, 'Logs');
-      await addDoc(logsRef, logData);
-      console.log('Log added successfully!');
-    } catch (error) {
-      console.error('Error adding log:', error.message);
-    }
   };
 
   return (
@@ -110,9 +94,20 @@ const BookForm = ({ open, setOpen, fetchBooks, book }) => {
               onChange={(e) => setCategory(e.target.value)}
             >
               <MenuItem value="Fiction">Fiction</MenuItem>
-              <MenuItem value="Non-Fiction">Non-Fiction</MenuItem>
-              <MenuItem value="Science">Science</MenuItem>
+              <MenuItem value="Non Fiction">Non Fiction</MenuItem>
+              <MenuItem value="Mystery & Thriller">Mystery & Thriller</MenuItem>
+              <MenuItem value="Adventure">Adventure</MenuItem>
+              <MenuItem value="Biography">Biography</MenuItem>
+              <MenuItem value="Self help & Personality Development">Self help & Personality Development</MenuItem>
+              <MenuItem value="Health & Wellness">Health & Wellness</MenuItem>
+              <MenuItem value="Politics & Social">Politics & Social</MenuItem>
+              <MenuItem value="Philosophy & Religion">Philosophy & Religion</MenuItem>
               <MenuItem value="History">History</MenuItem>
+              <MenuItem value="Travel & Geography">Travel & Geography</MenuItem>
+              <MenuItem value="Science">Science</MenuItem>
+              <MenuItem value="Business & Finance">Business & Finance</MenuItem>
+              <MenuItem value="Reference & Dictionaries">Reference & Dictionaries</MenuItem>
+              <MenuItem value="Children Book">Children Book</MenuItem>
             </Select>
           </FormControl>
           <TextField
@@ -125,7 +120,9 @@ const BookForm = ({ open, setOpen, fetchBooks, book }) => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained">Save</Button>
+          <Button onClick={handleSubmit} variant="contained" disabled={loading}>
+            {loading ? <CircularProgress size={24} /> : 'Save'}
+          </Button>
         </DialogActions>
       </Dialog>
       <Snackbar
