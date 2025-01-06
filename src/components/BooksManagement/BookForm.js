@@ -1,11 +1,61 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/firebaseConfig';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { Dialog, DialogTitle, DialogContent, TextField, DialogActions, Button, MenuItem, Select, InputLabel, FormControl, Snackbar, Alert, CircularProgress } from '@mui/material';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  TextField,
+  DialogActions,
+  Button,
+  Snackbar,
+  Alert,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Chip,
+  Box,
+  OutlinedInput,
+  useTheme,
+} from '@mui/material';
 import { getAuth } from 'firebase/auth';
 import { addLog } from '../../utils/firebaseUtils';
 
+// Categories list
+const categories = [
+  'Fiction',
+  'Non Fiction',
+  'Mystery & Thriller',
+  'Adventure',
+  'Biography',
+  'Self help & Personality Development',
+  'Health & Wellness',
+  'Politics & Social',
+  'Philosophy & Religion',
+  'History',
+  'Travel & Geography',
+  'Science',
+  'Business & Finance',
+  'Reference & Dictionaries',
+  'Children Book',
+];
+
+// Menu props for the Select component
+const ITEM_HEIGHT = 48;
+const ITEM_PADDING_TOP = 8;
+const MenuProps = {
+  PaperProps: {
+    style: {
+      maxHeight: ITEM_HEIGHT * 4.5 + ITEM_PADDING_TOP,
+      width: 250,
+    },
+  },
+};
+
 const BookForm = ({ open, setOpen, fetchBooks, book }) => {
+  const theme = useTheme();
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [category, setCategory] = useState([]);
@@ -22,7 +72,7 @@ const BookForm = ({ open, setOpen, fetchBooks, book }) => {
     if (book) {
       setTitle(book.title || '');
       setAuthor(book.author || '');
-      setCategory(book.category || []);
+      setCategory(book.category || []); // Ensure category is initialized as an array
       setCollectionName(book.collection || '');
     } else {
       // Reset fields if no book is provided (i.e., adding a new book)
@@ -32,6 +82,14 @@ const BookForm = ({ open, setOpen, fetchBooks, book }) => {
       setCollectionName('');
     }
   }, [book]);
+
+  // Handle category selection
+  const handleCategoryChange = (event) => {
+    const {
+      target: { value },
+    } = event;
+    setCategory(typeof value === 'string' ? value.split(',') : value);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -102,27 +160,36 @@ const BookForm = ({ open, setOpen, fetchBooks, book }) => {
             margin="normal"
           />
           <FormControl fullWidth margin="normal">
-            <InputLabel>Category</InputLabel>
+            <InputLabel id="categories-label">Categories</InputLabel>
             <Select
+              labelId="categories-label"
+              id="categories"
               multiple
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={handleCategoryChange}
+              input={<OutlinedInput id="select-categories" label="Categories" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {selected.map((value) => (
+                    <Chip key={value} label={value} />
+                  ))}
+                </Box>
+              )}
+              MenuProps={MenuProps}
             >
-              <MenuItem value="Fiction">Fiction</MenuItem>
-              <MenuItem value="Non Fiction">Non Fiction</MenuItem>
-              <MenuItem value="Mystery & Thriller">Mystery & Thriller</MenuItem>
-              <MenuItem value="Adventure">Adventure</MenuItem>
-              <MenuItem value="Biography">Biography</MenuItem>
-              <MenuItem value="Self help & Personality Development">Self help & Personality Development</MenuItem>
-              <MenuItem value="Health & Wellness">Health & Wellness</MenuItem>
-              <MenuItem value="Politics & Social">Politics & Social</MenuItem>
-              <MenuItem value="Philosophy & Religion">Philosophy & Religion</MenuItem>
-              <MenuItem value="History">History</MenuItem>
-              <MenuItem value="Travel & Geography">Travel & Geography</MenuItem>
-              <MenuItem value="Science">Science</MenuItem>
-              <MenuItem value="Business & Finance">Business & Finance</MenuItem>
-              <MenuItem value="Reference & Dictionaries">Reference & Dictionaries</MenuItem>
-              <MenuItem value="Children Book">Children Book</MenuItem>
+              {categories.map((cat) => (
+                <MenuItem
+                  key={cat}
+                  value={cat}
+                  style={{
+                    fontWeight: category.includes(cat)
+                      ? theme.typography.fontWeightMedium
+                      : theme.typography.fontWeightRegular,
+                  }}
+                >
+                  {cat}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
           <TextField
