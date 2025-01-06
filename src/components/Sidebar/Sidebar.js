@@ -26,10 +26,20 @@ const Sidebar = ({ darkMode }) => {
           boxSizing: 'border-box',
           backgroundColor: darkMode ? '#1e1e1e' : '#ffffff',
           color: darkMode ? '#ffffff' : '#000000',
+          transition: 'background-color 0.3s, color 0.3s', // Smooth transition for dark mode
         },
       }}
     >
-      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Box
+        sx={{
+          p: 2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: darkMode ? '#1e1e1e' : '#ffffff',
+          color: darkMode ? '#ffffff' : '#000000',
+        }}
+      >
         <Typography variant="h6" sx={{ display: open ? 'block' : 'none' }}>
           MyLib
         </Typography>
@@ -37,22 +47,30 @@ const Sidebar = ({ darkMode }) => {
           <MenuIcon />
         </IconButton>
       </Box>
-      <Divider />
+      <Divider sx={{ backgroundColor: darkMode ? '#333333' : '#e0e0e0' }} />
       <List>
         <ListItem button component={Link} to="/">
-          <ListItemIcon sx={{ color: darkMode ? '#ffffff' : '#000000' }}><DashboardIcon /></ListItemIcon>
+          <ListItemIcon sx={{ color: darkMode ? '#ffffff' : '#000000' }}>
+            <DashboardIcon />
+          </ListItemIcon>
           <ListItemText primary="Dashboard" sx={{ display: open ? 'block' : 'none' }} />
         </ListItem>
         <ListItem button component={Link} to="/books">
-          <ListItemIcon sx={{ color: darkMode ? '#ffffff' : '#000000' }}><BookIcon /></ListItemIcon>
+          <ListItemIcon sx={{ color: darkMode ? '#ffffff' : '#000000' }}>
+            <BookIcon />
+          </ListItemIcon>
           <ListItemText primary="Books" sx={{ display: open ? 'block' : 'none' }} />
         </ListItem>
         <ListItem button component={Link} to="/borrowers">
-          <ListItemIcon sx={{ color: darkMode ? '#ffffff' : '#000000' }}><PeopleIcon /></ListItemIcon>
+          <ListItemIcon sx={{ color: darkMode ? '#ffffff' : '#000000' }}>
+            <PeopleIcon />
+          </ListItemIcon>
           <ListItemText primary="Borrowers" sx={{ display: open ? 'block' : 'none' }} />
         </ListItem>
         <ListItem button component={Link} to="/logs">
-          <ListItemIcon sx={{ color: darkMode ? '#ffffff' : '#000000' }}><ListAltIcon /></ListItemIcon>
+          <ListItemIcon sx={{ color: darkMode ? '#ffffff' : '#000000' }}>
+            <ListAltIcon />
+          </ListItemIcon>
           <ListItemText primary="Logs" sx={{ display: open ? 'block' : 'none' }} />
         </ListItem>
       </List>
