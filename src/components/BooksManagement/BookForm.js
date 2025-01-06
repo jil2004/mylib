@@ -1,5 +1,4 @@
-// src/components/BookForm.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/firebaseConfig';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Dialog, DialogTitle, DialogContent, TextField, DialogActions, Button, MenuItem, Select, InputLabel, FormControl, Snackbar, Alert, CircularProgress } from '@mui/material';
@@ -7,16 +6,32 @@ import { getAuth } from 'firebase/auth';
 import { addLog } from '../../utils/firebaseUtils';
 
 const BookForm = ({ open, setOpen, fetchBooks, book }) => {
-  const [title, setTitle] = useState(book?.title || '');
-  const [author, setAuthor] = useState(book?.author || '');
-  const [category, setCategory] = useState(book?.category || []);
-  const [collectionName, setCollectionName] = useState(book?.collection || '');
+  const [title, setTitle] = useState('');
+  const [author, setAuthor] = useState('');
+  const [category, setCategory] = useState([]);
+  const [collectionName, setCollectionName] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
   const [loading, setLoading] = useState(false);
   const auth = getAuth();
   const user = auth.currentUser;
+
+  // Reset form fields when the `book` prop changes
+  useEffect(() => {
+    if (book) {
+      setTitle(book.title || '');
+      setAuthor(book.author || '');
+      setCategory(book.category || []);
+      setCollectionName(book.collection || '');
+    } else {
+      // Reset fields if no book is provided (i.e., adding a new book)
+      setTitle('');
+      setAuthor('');
+      setCategory([]);
+      setCollectionName('');
+    }
+  }, [book]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
