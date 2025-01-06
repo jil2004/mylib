@@ -1,4 +1,3 @@
-// src/components/BooksManagement.js
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/firebaseConfig';
 import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
@@ -6,6 +5,7 @@ import { Button, Typography, Box, TextField, List, ListItem, ListItemText, Divid
 import BookForm from './BookForm';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { getAuth } from 'firebase/auth';
 
 const BooksManagement = () => {
   const [books, setBooks] = useState([]);
@@ -15,38 +15,69 @@ const BooksManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    fetchBooks();
-  }, []);
-
+  // Fetch books from Firestore
   const fetchBooks = async () => {
     setLoading(true);
     try {
-      const booksSnapshot = await getDocs(collection(db, 'Books'));
-      const booksData = booksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setBooks(booksData);
-      setFilteredBooks(booksData);
+      const auth = getAuth();
+      const user = auth.currentUser;
+
+      if (!user) {
+        console.error('User not logged in.');
+        return;
+      }
+
+      // Query the nested collection: Users/{userId}/books
+      const booksRef = collection(db, 'Users', user.uid, 'books');
+      console.log('Fetching books from:', booksRef.path); // Debugging log
+      const booksSnapshot = await getDocs(booksRef);
+      console.log('Books Snapshot:', booksSnapshot); // Debugging log
+
+      if (booksSnapshot.empty) {
+        console.log('No books found in the collection.'); // Debugging log
+      } else {
+        const booksData = booksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log('Fetched Books:', booksData); // Debugging log
+        setBooks(booksData);
+        setFilteredBooks(booksData);
+      }
     } catch (error) {
-      console.error('Error fetching books:', error.message);
+      console.error('Error fetching books:', error.message); // Debugging log
     } finally {
       setLoading(false);
     }
   };
 
+  // Fetch books when the component mounts
+  useEffect(() => {
+    fetchBooks();
+  }, []);
+
+  // Handle search input
   const handleSearch = (e) => {
     const term = e.target.value.toLowerCase();
     setSearchTerm(term);
     const filtered = books.filter(book =>
-      book.name.toLowerCase().includes(term) ||
+      book.title.toLowerCase().includes(term) || // Use `title` instead of `name`
       book.author.toLowerCase().includes(term)
     );
     setFilteredBooks(filtered);
   };
 
+  // Handle book deletion
   const handleDelete = async (id) => {
     try {
-      await deleteDoc(doc(db, 'Books', id));
-      fetchBooks();
+      const auth = getAuth();
+      const user = auth.currentUser;
+
+      if (!user) {
+        console.error('User not logged in.');
+        return;
+      }
+
+      // Delete from the nested collection: Users/{userId}/books/{bookId}
+      await deleteDoc(doc(db, 'Users', user.uid, 'books', id));
+      fetchBooks(); // Refresh the list after deletion
     } catch (error) {
       console.error('Error deleting book:', error.message);
     }
@@ -74,8 +105,8 @@ const BooksManagement = () => {
               <React.Fragment key={book.id}>
                 <ListItem>
                   <ListItemText
-                    primary={book.name}
-                    secondary={`Author: ${book.author} | Categories: ${book.category?.join(', ') || 'No categories'} | Added: ${book.addDate?.toDate().toLocaleDateString()}`}
+                    primary={book.title} // Use `title` instead of `name`
+                    secondary={`Author: ${book.author} | Categories: ${book.category?.join(', ') || 'No categories'} | Added: ${book.addDate ? book.addDate.toDate().toLocaleDateString() : 'Unknown'}`}
                   />
                   <IconButton onClick={() => { setSelectedBook(book); setOpen(true); }}>
                     <EditIcon />
