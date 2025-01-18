@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/firebaseConfig';
-import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
 import {
   Dialog,
   DialogTitle,
@@ -11,17 +11,15 @@ import {
   Snackbar,
   Alert,
   CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip,
+  Paper,
+  styled,
+  Typography,
   Box,
-  OutlinedInput,
-  useTheme,
+  Chip
 } from '@mui/material';
 import { getAuth } from 'firebase/auth';
-import { addLog } from '../../utils/firebaseUtils';
+import LocalLibraryIcon from '@mui/icons-material/LocalLibrary';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 // Categories list
 const categories = [
@@ -42,53 +40,92 @@ const categories = [
   'Children Book',
 ];
 
-// Menu props for the Select component
-const ITEM_HEIGHT = 48;
-const ITEM_PADDING_TOP = 8;
-const MenuProps = {
-  PaperProps: {
-    style: {
-      maxHeight: ITEM_HEIGHT * 4.5 + ITEM_PADDING_TOP,
-      width: 250,
-    },
-  },
-};
+const ListItem = styled('li')(({ theme }) => ({
+  margin: theme.spacing(0.5),
+}));
+
+const CategoryChip = styled(Paper)(({ theme }) => ({
+  display: 'flex',
+  justifyContent: 'center',
+  flexWrap: 'wrap',
+  listStyle: 'none',
+  padding: theme.spacing(1),
+  margin: theme.spacing(1, 0),
+  backgroundColor: theme.palette.grey[50],
+}));
 
 const BookForm = ({ open, setOpen, fetchBooks, book }) => {
-  const theme = useTheme();
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
-  const [category, setCategory] = useState([]);
-  const [collectionName, setCollectionName] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState([]);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
   const auth = getAuth();
   const user = auth.currentUser;
 
-  // Reset form fields when the `book` prop changes
   useEffect(() => {
     if (book) {
       setTitle(book.title || '');
       setAuthor(book.author || '');
-      setCategory(book.category || []); // Ensure category is initialized as an array
-      setCollectionName(book.collection || '');
+      setSelectedCategories(
+        book.category?.map((cat, index) => ({
+          key: index,
+          label: cat,
+        })) || []
+      );
     } else {
-      // Reset fields if no book is provided (i.e., adding a new book)
-      setTitle('');
-      setAuthor('');
-      setCategory([]);
-      setCollectionName('');
+      resetForm();
     }
   }, [book]);
 
-  // Handle category selection
-  const handleCategoryChange = (event) => {
-    const {
-      target: { value },
-    } = event;
-    setCategory(typeof value === 'string' ? value.split(',') : value);
+  const resetForm = () => {
+    setTitle('');
+    setAuthor('');
+    setSelectedCategories([]);
+    setErrors({});
+  };
+
+  const handleAddCategory = (category) => {
+    if (!selectedCategories.some(cat => cat.label === category)) {
+      setSelectedCategories([
+        ...selectedCategories,
+        { key: selectedCategories.length, label: category }
+      ]);
+    }
+  };
+
+  const handleDeleteCategory = (categoryToDelete) => {
+    setSelectedCategories(
+      selectedCategories.filter((category) => category.key !== categoryToDelete.key)
+    );
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!title.trim()) newErrors.title = 'Title is required';
+    if (!author.trim()) newErrors.author = 'Author is required';
+    if (selectedCategories.length === 0) newErrors.categories = 'At least one category is required';
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const checkDuplicateBook = async () => {
+    const userBooksRef = collection(db, 'Users', user.uid, 'books');
+    const q = query(
+      userBooksRef,
+      where('title', '==', title.trim()),
+      where('author', '==', author.trim())
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const isDuplicate = !querySnapshot.empty && 
+      (!book || (book && querySnapshot.docs[0].id !== book.id));
+    
+    return isDuplicate;
   };
 
   const handleSubmit = async (e) => {
@@ -101,31 +138,48 @@ const BookForm = ({ open, setOpen, fetchBooks, book }) => {
       return;
     }
 
-    const bookData = {
-      title,
-      author,
-      category,
-      collection: collectionName,
-      addDate: serverTimestamp(),
-    };
+    if (!validateForm()) return;
 
     setLoading(true);
     try {
+      const isDuplicate = await checkDuplicateBook();
+      if (isDuplicate) {
+        setSnackbarMessage('This book already exists in your library!');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
+        setLoading(false);
+        return;
+      }
+
+      const bookData = {
+        title: title.trim(),
+        author: author.trim(),
+        category: selectedCategories.map(cat => cat.label),
+        addDate: serverTimestamp(),
+        lastModified: serverTimestamp(),
+      };
+
       if (book) {
-        // Update existing book
         await updateDoc(doc(db, 'Users', user.uid, 'books', book.id), bookData);
         setSnackbarMessage('Book updated successfully!');
-        await addLog('UPDATE_BOOK', book.id, null, `Updated book "${title}" by ${author}`);
+        await addDoc(collection(db, 'Users', user.uid, 'logs'), {
+          action: `Updated book "${title}" by ${author}`,
+          timestamp: new Date(),
+        });
       } else {
-        // Add new book
         const userBooksRef = collection(db, 'Users', user.uid, 'books');
         const newBookRef = await addDoc(userBooksRef, bookData);
         setSnackbarMessage('Book added successfully!');
-        await addLog('ADD_BOOK', newBookRef.id, null, `Added book "${title}" by ${author}`);
+        await addDoc(collection(db, 'Users', user.uid, 'logs'), {
+          action: `Added book "${title}" by ${author}`,
+          timestamp: new Date(),
+        });
       }
+      
       setSnackbarSeverity('success');
-      fetchBooks();
+      fetchBooks();  // Ensure this is called correctly
       setOpen(false);
+      resetForm();
     } catch (error) {
       console.error('Error:', error.message);
       setSnackbarMessage(error.message || 'An error occurred. Please try again.');
@@ -136,83 +190,119 @@ const BookForm = ({ open, setOpen, fetchBooks, book }) => {
     }
   };
 
-  const handleCloseSnackbar = () => {
-    setSnackbarOpen(false);
-  };
-
   return (
     <>
-      <Dialog open={open} onClose={() => setOpen(false)}>
-        <DialogTitle>{book ? 'Edit Book' : 'Add Book'}</DialogTitle>
+      <Dialog 
+        open={open} 
+        onClose={() => setOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <LocalLibraryIcon />
+          <Typography variant="h6">
+            {book ? 'Edit Book' : 'Add New Book'}
+          </Typography>
+        </DialogTitle>
         <DialogContent>
-          <TextField
-            label="Title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="Author"
-            value={author}
-            onChange={(e) => setAuthor(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
-          <FormControl fullWidth margin="normal">
-            <InputLabel id="categories-label">Categories</InputLabel>
-            <Select
-              labelId="categories-label"
-              id="categories"
-              multiple
-              value={category}
-              onChange={handleCategoryChange}
-              input={<OutlinedInput id="select-categories" label="Categories" />}
-              renderValue={(selected) => (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                  {selected.map((value) => (
-                    <Chip key={value} label={value} />
-                  ))}
-                </Box>
-              )}
-              MenuProps={MenuProps}
-            >
-              {categories.map((cat) => (
-                <MenuItem
-                  key={cat}
-                  value={cat}
-                  style={{
-                    fontWeight: category.includes(cat)
-                      ? theme.typography.fontWeightMedium
-                      : theme.typography.fontWeightRegular,
-                  }}
-                >
-                  {cat}
-                </MenuItem>
+          <Box component="form" noValidate sx={{ mt: 1 }}>
+            <TextField
+              label="Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              fullWidth
+              margin="normal"
+              error={!!errors.title}
+              helperText={errors.title}
+              required
+            />
+            <TextField
+              label="Author"
+              value={author}
+              onChange={(e) => setAuthor(e.target.value)}
+              fullWidth
+              margin="normal"
+              error={!!errors.author}
+              helperText={errors.author}
+              required
+            />
+            
+            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+              Categories
+            </Typography>
+            <CategoryChip component="ul" elevation={0}>
+              {selectedCategories.map((data) => (
+                <ListItem key={data.key}>
+                  <Chip
+                    icon={<LocalLibraryIcon />}
+                    label={data.label}
+                    onDelete={() => handleDeleteCategory(data)}
+                    deleteIcon={<DeleteIcon />}
+                    color="primary"
+                    variant="outlined"
+                  />
+                </ListItem>
               ))}
-            </Select>
-          </FormControl>
-          <TextField
-            label="Collection"
-            value={collectionName}
-            onChange={(e) => setCollectionName(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
+            </CategoryChip>
+            
+            <Paper sx={{ p: 2, mt: 2 }} elevation={0} variant="outlined">
+              <Typography variant="subtitle2" gutterBottom>
+                Available Categories:
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {categories
+                  .filter(cat => !selectedCategories.some(selected => selected.label === cat))
+                  .map((category) => (
+                    <Chip
+                      key={category}
+                      label={category}
+                      onClick={() => handleAddCategory(category)}
+                      color="default"
+                      size="small"
+                      sx={{ cursor: 'pointer' }}
+                    />
+                  ))}
+              </Box>
+            </Paper>
+            
+            {errors.categories && (
+              <Typography color="error" variant="caption" sx={{ mt: 1, display: 'block' }}>
+                {errors.categories}
+              </Typography>
+            )}
+          </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained" disabled={loading}>
-            {loading ? <CircularProgress size={24} /> : 'Save'}
+        <DialogActions sx={{ p: 2 }}>
+          <Button 
+            onClick={() => {
+              setOpen(false);
+              resetForm();
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            variant="contained" 
+            disabled={loading}
+            startIcon={loading ? <CircularProgress size={20} /> : null}
+          >
+            {loading ? 'Saving...' : 'Save Book'}
           </Button>
         </DialogActions>
       </Dialog>
+      
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity}>
+        <Alert 
+          onClose={() => setSnackbarOpen(false)} 
+          severity={snackbarSeverity}
+          variant="filled"
+        >
           {snackbarMessage}
         </Alert>
       </Snackbar>
