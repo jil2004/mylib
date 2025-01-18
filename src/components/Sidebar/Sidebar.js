@@ -26,7 +26,7 @@ const Sidebar = ({ darkMode }) => {
           boxSizing: 'border-box',
           backgroundColor: darkMode ? '#1e1e1e' : '#ffffff',
           color: darkMode ? '#ffffff' : '#000000',
-          transition: 'background-color 0.3s, color 0.3s', // Smooth transition for dark mode
+          transition: 'width 0.3s ease, background-color 0.3s, color 0.3s',
         },
       }}
     >
