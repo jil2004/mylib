@@ -1,139 +1,184 @@
-// src/components/BorrowersManagement.js
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/firebaseConfig';
-import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { Button, Typography, Box, TextField, List, ListItem, ListItemText, Divider, IconButton, Autocomplete, Chip, Card, CircularProgress } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { collection, getDocs, doc, deleteDoc, addDoc, query, orderBy } from 'firebase/firestore';
+import {
+  Box,
+  Typography,
+  Button,
+  CircularProgress,
+  Alert,
+  TextField,
+  IconButton,
+  Paper,
+} from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import SearchIcon from '@mui/icons-material/Search';
+import { getAuth } from 'firebase/auth';
 import BorrowerForm from './BorrowerForm';
+import BorrowerList from './BorrowerList';
 
 const BorrowersManagement = () => {
   const [borrowers, setBorrowers] = useState([]);
   const [filteredBorrowers, setFilteredBorrowers] = useState([]);
+  const [books, setBooks] = useState([]);
   const [open, setOpen] = useState(false);
   const [selectedBorrower, setSelectedBorrower] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [books, setBooks] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const auth = getAuth();
+  const user = auth.currentUser;
 
   useEffect(() => {
-    fetchBorrowers();
-    fetchBooks();
-  }, []);
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
-  const fetchBorrowers = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const borrowersSnapshot = await getDocs(collection(db, 'Borrowers'));
-      const booksSnapshot = await getDocs(collection(db, 'Books'));
-      const booksData = booksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Fetch books
+      const booksSnapshot = await getDocs(collection(db, `Users/${user.uid}/books`));
+      const booksData = booksSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setBooks(booksData);
 
-      const borrowersData = borrowersSnapshot.docs.map(doc => {
+      // Fetch borrowers
+      const borrowersSnapshot = await getDocs(collection(db, `Users/${user.uid}/borrowers`));
+      const borrowersData = borrowersSnapshot.docs.map((doc) => {
         const borrower = doc.data();
-        const borrowedBooks = borrower.borrowedBooks?.map(bookId => {
-          const book = booksData.find(b => b.id === bookId);
-          return book ? { id: bookId, name: book.name, borrowDate: borrower.borrowDate } : { id: bookId, name: 'Unknown Book', borrowDate: borrower.borrowDate };
-        });
-        return { id: doc.id, ...borrower, borrowedBooks };
+        const borrowedBooks = borrower.borrowedBooks?.map((bookId) => {
+          const book = booksData.find((b) => b.id === bookId);
+          return book ? { id: bookId, title: book.title } : null;
+        }).filter((book) => book);
+
+        return {
+          id: doc.id,
+          ...borrower,
+          borrowedBooks: borrowedBooks || [],
+        };
       });
 
-      const filtered = borrowersData.filter(borrower => borrower.borrowedBooks?.length > 0);
-      setBorrowers(filtered);
-      setFilteredBorrowers(filtered);
-    } catch (error) {
-      console.error('Error fetching borrowers:', error.message);
+      setBorrowers(borrowersData);
+      setFilteredBorrowers(borrowersData);
+
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError('Failed to load data. Please try again.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchBooks = async () => {
-    try {
-      const booksSnapshot = await getDocs(collection(db, 'Books'));
-      setBooks(booksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    } catch (error) {
-      console.error('Error fetching books:', error.message);
     }
   };
 
   const handleSearch = (e) => {
     const term = e.target.value.toLowerCase();
     setSearchTerm(term);
-    const filtered = borrowers.filter(borrower =>
+    const filtered = borrowers.filter((borrower) =>
       borrower.name.toLowerCase().includes(term)
     );
     setFilteredBorrowers(filtered);
   };
 
-  const handleDelete = async (id) => {
+  const handleEdit = (borrower) => {
+    setSelectedBorrower(borrower);
+    setOpen(true);
+  };
+
+  const handleDeleteBorrower = async (borrowerId, borrowerName, borrowedBooks) => {
     try {
-      await deleteDoc(doc(db, 'Borrowers', id));
-      fetchBorrowers();
+      if (!user) return;
+
+      // Delete the borrower
+      await deleteDoc(doc(db, `Users/${user.uid}/borrowers`, borrowerId));
+
+      // Add a log entry with the borrower's name and borrowed books
+      await addDoc(collection(db, `Users/${user.uid}/logs`), {
+        action: `Deleted borrower "${borrowerName}" with ID ${borrowerId}. Borrowed books: ${borrowedBooks.map(book => `${book.title} (ID: ${book.id})`).join(', ')}`,
+        timestamp: new Date(), // Use the current date and time
+      });
+
+      // Refresh data
+      fetchData();
     } catch (error) {
-      console.error('Error deleting borrower:', error.message);
+      console.error('Error deleting borrower:', error);
     }
   };
 
-  const handleRemoveBook = async (borrowerId, bookId) => {
-    try {
-      const borrower = borrowers.find(b => b.id === borrowerId);
-      const updatedBooks = borrower.borrowedBooks.filter(book => book.id !== bookId);
-      await updateDoc(doc(db, 'Borrowers', borrowerId), { borrowedBooks: updatedBooks.map(book => book.id) });
-      fetchBorrowers();
-    } catch (error) {
-      console.error('Error removing book:', error.message);
-    }
-  };
+  if (!user) {
+    return <Alert severity="error">Please log in to manage borrowers.</Alert>;
+  }
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>Borrowers Management</Typography>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <TextField
-          label="Search Borrowers"
-          variant="outlined"
-          value={searchTerm}
-          onChange={handleSearch}
-          sx={{ width: '300px' }}
-        />
-        <Button variant="contained" onClick={() => { setSelectedBorrower(null); setOpen(true); }}>Add Borrower</Button>
+      <Paper elevation={0} sx={{ p: 3, mb: 3, bgcolor: 'primary.light' }}>
+        <Typography variant="h4" gutterBottom sx={{ color: 'white' }}>
+          Borrowers Management
+        </Typography>
+        <Typography variant="subtitle1" sx={{ color: 'white', opacity: 0.9 }}>
+          Manage your book borrowers and their borrowed books
+        </Typography>
+      </Paper>
+
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', flex: 1, maxWidth: 500 }}>
+          <IconButton sx={{ p: '10px' }} aria-label="search">
+            <SearchIcon />
+          </IconButton>
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Search borrowers..."
+            value={searchTerm}
+            onChange={handleSearch}
+            size="small"
+          />
+        </Box>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => {
+            setSelectedBorrower(null);
+            setOpen(true);
+          }}
+        >
+          Add Borrower
+        </Button>
       </Box>
-      <Card sx={{ borderRadius: 2, boxShadow: 3 }}>
-        {loading ? (
-          <CircularProgress sx={{ display: 'block', margin: '20px auto' }} />
-        ) : (
-          <List>
-            {filteredBorrowers.map((borrower, index) => (
-              <React.Fragment key={borrower.id}>
-                <ListItem>
-                  <ListItemText
-                    primary={borrower.name}
-                    secondary={
-                      borrower.borrowedBooks?.map(book => (
-                        <Box key={book.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="body2">{book.name}</Typography>
-                          <Typography variant="body2" color="text.secondary">(Borrowed on: {book.borrowDate?.toDate().toLocaleDateString()})</Typography>
-                          <IconButton onClick={() => handleRemoveBook(borrower.id, book.id)}>
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      ))
-                    }
-                  />
-                  <IconButton onClick={() => { setSelectedBorrower(borrower); setOpen(true); }}>
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton onClick={() => handleDelete(borrower.id)}>
-                    <DeleteIcon />
-                  </IconButton>
-                </ListItem>
-                {index < filteredBorrowers.length - 1 && <Divider />}
-              </React.Fragment>
-            ))}
-          </List>
-        )}
-      </Card>
-      <BorrowerForm open={open} setOpen={setOpen} fetchBorrowers={fetchBorrowers} borrower={selectedBorrower} books={books} />
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+          <CircularProgress />
+        </Box>
+      ) : filteredBorrowers.length === 0 ? (
+        <Alert severity="info">
+          {searchTerm ? 'No borrowers found matching your search.' : 'No borrowers added yet.'}
+        </Alert>
+      ) : (
+        <BorrowerList
+          borrowers={filteredBorrowers}
+          onEdit={handleEdit}
+          onDeleteBorrower={handleDeleteBorrower}
+        />
+      )}
+
+      <BorrowerForm
+        open={open}
+        setOpen={setOpen}
+        fetchBorrowers={fetchData}
+        borrower={selectedBorrower}
+        books={books}
+      />
     </Box>
   );
 };
