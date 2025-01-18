@@ -107,7 +107,7 @@ const Signup = () => {
           Sign Up
         </Button>
         <Typography sx={{ mt: 2 }}>
-          Already have an account? <Link to="/login">Login</Link>
+          Already have an account? <Link href="/login">Login</Link>
         </Typography>
       </Box>
       <Snackbar
