@@ -1,28 +1,74 @@
 import React from 'react';
-import { db } from '../../firebase/firebaseConfig';
-import { doc, deleteDoc } from 'firebase/firestore';
-import { Card, CardContent, Typography, Button, Grid } from '@mui/material';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  IconButton,
+  Tooltip,
+  Typography,
+} from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import BookIcon from '@mui/icons-material/Book';
 
-const BorrowerList = ({ borrowers, fetchBorrowers }) => {
-  const handleDelete = async (id) => {
-    await deleteDoc(doc(db, 'Borrowers', id));
-    fetchBorrowers();
-  };
-
+const BorrowerList = ({ borrowers, onEdit, onDeleteBorrower }) => {
   return (
-    <Grid container spacing={3}>
-      {borrowers.map(borrower => (
-        <Grid item xs={12} md={4} key={borrower.id}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6">{borrower.name}</Typography>
-              <Typography>{borrower.email}</Typography>
-              <Button onClick={() => handleDelete(borrower.id)}>Delete</Button>
-            </CardContent>
-          </Card>
-        </Grid>
-      ))}
-    </Grid>
+    <TableContainer component={Paper}>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell>Name</TableCell>
+            <TableCell>Borrowed Books</TableCell>
+            <TableCell>Actions</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {borrowers.map((borrower) => (
+            <TableRow key={borrower.id}>
+              <TableCell>
+                <Typography variant="body1">{borrower.name}</Typography>
+              </TableCell>
+              <TableCell>
+                {borrower.borrowedBooks && borrower.borrowedBooks.length > 0 ? (
+                  borrower.borrowedBooks.map((book) => (
+                    <Chip
+                      key={book.id}
+                      label={book.title}
+                      icon={<BookIcon />}
+                      sx={{ m: 0.5 }}
+                    />
+                  ))
+                ) : (
+                  <Typography variant="body2" color="textSecondary">
+                    No books borrowed
+                  </Typography>
+                )}
+              </TableCell>
+              <TableCell>
+                <Tooltip title="Edit">
+                  <IconButton onClick={() => onEdit(borrower)} color="primary">
+                    <EditIcon />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Delete">
+                  <IconButton
+                    onClick={() => onDeleteBorrower(borrower.id, borrower.name, borrower.borrowedBooks)} // Pass borrower name and borrowed books
+                    color="error"
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </Tooltip>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
   );
 };
 
