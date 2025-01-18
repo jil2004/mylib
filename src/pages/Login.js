@@ -32,7 +32,8 @@ const Login = () => {
 
       navigate('/'); // Redirect to dashboard after successful login
     } catch (error) {
-      setError(error.message);
+      // setError(error.message);
+      setError("Invalid Credentials")
       setSnackbarOpen(true);
     }
   };
