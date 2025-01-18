@@ -65,7 +65,7 @@ function App() {
       <CssBaseline />
       <Router>
         <Box sx={{ display: 'flex' }}>
-          {user && user.emailVerified && <Sidebar />}
+          {user && user.emailVerified && <Sidebar darkMode={darkMode} />}
           <Box component="main" sx={{ flexGrow: 1 }}>
             {user && user.emailVerified && <Navbar darkMode={darkMode} setDarkMode={setDarkMode} />}
             <Box sx={{ p: 3 }}>
