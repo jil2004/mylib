@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/firebaseConfig';
-import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, addDoc } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import {
   Button,
   Typography,
@@ -20,7 +21,6 @@ import {
   Chip,
   OutlinedInput,
   Checkbox,
-  FormControlLabel,
   Paper,
   Table,
   TableBody,
@@ -28,15 +28,33 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
+  ToggleButton,
+  ToggleButtonGroup,
+  InputAdornment,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Grid,
+  Tooltip,
+  Alert,
+  Snackbar,
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
-import { TableVirtuoso } from 'react-virtuoso';
-import BookForm from './BookForm';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import SearchIcon from '@mui/icons-material/Search';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import SortIcon from '@mui/icons-material/Sort';
+import GridViewIcon from '@mui/icons-material/GridView';
+import ViewListIcon from '@mui/icons-material/ViewList';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import AddIcon from '@mui/icons-material/Add';
+import BookForm from './BookForm';
 
 const categories = [
   'Fiction',
@@ -57,6 +75,10 @@ const categories = [
 ];
 
 const BooksManagement = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  // State declarations
   const [books, setBooks] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [open, setOpen] = useState(false);
@@ -68,20 +90,32 @@ const BooksManagement = () => {
   const [selectedAuthors, setSelectedAuthors] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedCollections, setSelectedCollections] = useState([]);
-  const [dateRange, setDateRange] = useState({ start: null, end: null });
-  const [view, setView] = useState('list');
+  const [view, setView] = useState('list'); // Default to list view
   const [selectedBooks, setSelectedBooks] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  // Fetch books from Firestore
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  // Core functions
   const fetchBooks = async () => {
     setLoading(true);
     try {
-      const booksSnapshot = await getDocs(collection(db, 'Books'));
+      if (!user) {
+        showSnackbar('User not logged in', 'error');
+        return;
+      }
+
+      const booksRef = collection(db, 'Users', user.uid, 'books');
+      const booksSnapshot = await getDocs(booksRef);
       const booksData = booksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setBooks(booksData);
       setFilteredBooks(booksData);
+      showSnackbar('Books loaded successfully', 'success');
     } catch (error) {
-      console.error('Error fetching books:', error.message);
+      showSnackbar('Error fetching books: ' + error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -89,16 +123,22 @@ const BooksManagement = () => {
 
   useEffect(() => {
     fetchBooks();
-  }, []);
+  }, [user]);
 
-  // Handle search input
+  useEffect(() => {
+    applyFilters(searchTerm);
+  }, [selectedAuthors, selectedCategories, selectedCollections, sortField, sortOrder]);
+
+  const showSnackbar = (message, severity = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
   const handleSearch = (e) => {
     const term = e.target.value.toLowerCase();
     setSearchTerm(term);
     applyFilters(term);
   };
 
-  // Handle sorting
   const handleSort = (field) => {
     if (field === sortField) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -108,25 +148,21 @@ const BooksManagement = () => {
     }
   };
 
-  // Handle filters
   const applyFilters = (searchTerm = '') => {
     let filtered = books.filter(book =>
-      book.title.toLowerCase().includes(searchTerm) &&
+      (book.title.toLowerCase().includes(searchTerm) || 
+       book.author.toLowerCase().includes(searchTerm)) &&
       (selectedAuthors.length === 0 || selectedAuthors.includes(book.author)) &&
       (selectedCategories.length === 0 || selectedCategories.some(cat => book.category.includes(cat))) &&
-      (selectedCollections.length === 0 || selectedCollections.includes(book.collection)) &&
-      (!dateRange.start || new Date(book.addDate.toDate()) >= dateRange.start) &&
-      (!dateRange.end || new Date(book.addDate.toDate()) <= dateRange.end)
+      (selectedCollections.length === 0 || selectedCollections.includes(book.collection))
     );
 
-    // Apply sorting
     filtered.sort((a, b) => {
+      const compareValue = sortOrder === 'asc' ? 1 : -1;
       if (sortField === 'title') {
-        return sortOrder === 'asc' ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title);
-      } else if (sortField === 'author') {
-        return sortOrder === 'asc' ? a.author.localeCompare(b.author) : b.author.localeCompare(a.author);
+        return a.title.localeCompare(b.title) * compareValue;
       } else if (sortField === 'addDate') {
-        return sortOrder === 'asc' ? a.addDate.toDate() - b.addDate.toDate() : b.addDate.toDate() - a.addDate.toDate();
+        return (a.addDate.toDate() - b.addDate.toDate()) * compareValue;
       }
       return 0;
     });
@@ -134,228 +170,316 @@ const BooksManagement = () => {
     setFilteredBooks(filtered);
   };
 
-  // Handle book selection
   const handleSelectBook = (id) => {
-    if (selectedBooks.includes(id)) {
-      setSelectedBooks(selectedBooks.filter(bookId => bookId !== id));
-    } else {
-      setSelectedBooks([...selectedBooks, id]);
-    }
+    setSelectedBooks(prev => 
+      prev.includes(id) ? prev.filter(bookId => bookId !== id) : [...prev, id]
+    );
   };
 
-  // Handle delete selected books
-  const handleDeleteSelected = async () => {
+  const handleDelete = async () => {
     try {
       for (const id of selectedBooks) {
-        await deleteDoc(doc(db, 'Books', id));
+        await deleteDoc(doc(db, 'Users', user.uid, 'books', id));
+        await addDoc(collection(db, 'Users', user.uid, 'logs'), {
+          action: `Deleted book with ID ${id}`,
+          timestamp: new Date(),
+        });
       }
-      fetchBooks();
+      setFilteredBooks(prev => prev.filter(book => !selectedBooks.includes(book.id)));
       setSelectedBooks([]);
+      showSnackbar(`Successfully deleted ${selectedBooks.length} book(s)`);
     } catch (error) {
-      console.error('Error deleting books:', error.message);
+      showSnackbar('Error deleting books: ' + error.message, 'error');
     }
+    setDeleteDialogOpen(false);
   };
 
-  // Handle delete individual book
-  const handleDelete = async (id) => {
-    try {
-      await deleteDoc(doc(db, 'Books', id));
-      fetchBooks();
-    } catch (error) {
-      console.error('Error deleting book:', error.message);
-    }
-  };
-
-  // Virtualized table components
-  const VirtuosoTableComponents = {
-    Scroller: React.forwardRef((props, ref) => (
-      <TableContainer component={Paper} {...props} ref={ref} />
-    )),
-    Table: (props) => (
-      <Table {...props} sx={{ borderCollapse: 'separate', tableLayout: 'fixed' }} />
-    ),
-    TableHead: React.forwardRef((props, ref) => <TableHead {...props} ref={ref} />),
-    TableRow,
-    TableBody: React.forwardRef((props, ref) => <TableBody {...props} ref={ref} />),
-  };
-
-  const fixedHeaderContent = () => (
-    <TableRow>
-      <TableCell padding="checkbox">
-        <Checkbox
-          indeterminate={selectedBooks.length > 0 && selectedBooks.length < filteredBooks.length}
-          checked={selectedBooks.length === filteredBooks.length}
-          onChange={(e) => {
-            if (e.target.checked) {
-              setSelectedBooks(filteredBooks.map(book => book.id));
-            } else {
-              setSelectedBooks([]);
-            }
-          }}
-        />
-      </TableCell>
-      <TableCell>Title</TableCell>
-      <TableCell>Author</TableCell>
-      <TableCell>Categories</TableCell>
-      <TableCell>Collection</TableCell>
-      <TableCell>Added Date</TableCell>
-      <TableCell>Actions</TableCell>
-    </TableRow>
+  const GridView = () => (
+    <Grid container spacing={2}>
+      {filteredBooks.map((book) => (
+        <Grid item xs={12} sm={6} md={4} key={book.id}>
+          <Card 
+            sx={{ 
+              height: '100%', 
+              display: 'flex', 
+              flexDirection: 'column',
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: theme.shadows[4]
+              }
+            }}
+          >
+            <Box sx={{ p: 2, flexGrow: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Typography variant="h6" noWrap sx={{ flexGrow: 1 }}>
+                  {book.title}
+                </Typography>
+                <Checkbox
+                  checked={selectedBooks.includes(book.id)}
+                  onChange={() => handleSelectBook(book.id)}
+                />
+              </Box>
+              <Typography color="textSecondary" gutterBottom>
+                {book.author}
+              </Typography>
+              <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {book.category.map((cat) => (
+                  <Chip
+                    key={cat}
+                    label={cat}
+                    size="small"
+                    sx={{ margin: '2px' }}
+                  />
+                ))}
+              </Box>
+            </Box>
+            <Box sx={{ p: 2, bgcolor: 'background.paper', borderTop: 1, borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="caption" color="textSecondary">
+                  Added: {book.addDate.toDate().toLocaleDateString()}
+                </Typography>
+                <IconButton 
+                  onClick={() => { setSelectedBook(book); setOpen(true); }}
+                  size="small"
+                >
+                  <EditIcon />
+                </IconButton>
+              </Box>
+            </Box>
+          </Card>
+        </Grid>
+      ))}
+    </Grid>
   );
 
-  const rowContent = (_index, row) => (
-    <TableRow>
-      <TableCell padding="checkbox">
-        <Checkbox
-          checked={selectedBooks.includes(row.id)}
-          onChange={() => handleSelectBook(row.id)}
-        />
-      </TableCell>
-      <TableCell>{row.title}</TableCell>
-      <TableCell>{row.author}</TableCell>
-      <TableCell>{row.category.join(', ')}</TableCell>
-      <TableCell>{row.collection}</TableCell>
-      <TableCell>{row.addDate.toDate().toLocaleDateString()}</TableCell>
-      <TableCell>
-        <IconButton onClick={() => { setSelectedBook(row); setOpen(true); }}>
-          <EditIcon />
-        </IconButton>
-        <IconButton onClick={() => handleDelete(row.id)}>
-          <DeleteIcon />
-        </IconButton>
-      </TableCell>
-    </TableRow>
+  const ListView = () => (
+    <TableContainer component={Paper}>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell padding="checkbox">
+              <Checkbox
+                checked={selectedBooks.length > 0 && selectedBooks.length === filteredBooks.length}
+                indeterminate={selectedBooks.length > 0 && selectedBooks.length < filteredBooks.length}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedBooks(filteredBooks.map(book => book.id));
+                  } else {
+                    setSelectedBooks([]);
+                  }
+                }}
+              />
+            </TableCell>
+            <TableCell>
+              <TableSortLabel
+                active={sortField === 'title'}
+                direction={sortOrder}
+                onClick={() => handleSort('title')}
+              >
+                Title
+              </TableSortLabel>
+            </TableCell>
+            <TableCell>Author</TableCell>
+            <TableCell>Categories</TableCell>
+            <TableCell>
+              <TableSortLabel
+                active={sortField === 'addDate'}
+                direction={sortOrder}
+                onClick={() => handleSort('addDate')}
+              >
+                Added Date
+              </TableSortLabel>
+            </TableCell>
+            <TableCell align="right">Actions</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {filteredBooks.map((book) => (
+            <TableRow key={book.id}>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  checked={selectedBooks.includes(book.id)}
+                  onChange={() => handleSelectBook(book.id)}
+                />
+              </TableCell>
+              <TableCell>{book.title}</TableCell>
+              <TableCell>{book.author}</TableCell>
+              <TableCell>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {book.category.map((cat) => (
+                    <Chip key={cat} label={cat} size="small" />
+                  ))}
+                </Box>
+              </TableCell>
+              <TableCell>{book.addDate.toDate().toLocaleDateString()}</TableCell>
+              <TableCell align="right">
+                <IconButton onClick={() => { setSelectedBook(book); setOpen(true); }}>
+                  <EditIcon />
+                </IconButton>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
   );
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>Books Management</Typography>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <TextField
-          label="Search Books"
-          variant="outlined"
-          value={searchTerm}
-          onChange={handleSearch}
-          sx={{ width: '300px' }}
-        />
-        <Button variant="contained" onClick={() => { setSelectedBook(null); setOpen(true); }}>Add Book</Button>
-      </Box>
-      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-        <FormControl sx={{ minWidth: 120 }}>
-          <InputLabel>Sort By</InputLabel>
-          <Select
-            value={sortField}
-            onChange={(e) => handleSort(e.target.value)}
-          >
-            <MenuItem value="title">Title</MenuItem>
-            <MenuItem value="author">Author</MenuItem>
-            <MenuItem value="addDate">Date Added</MenuItem>
-          </Select>
-        </FormControl>
-        <IconButton onClick={() => handleSort(sortField)}>
-          {sortOrder === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />}
-        </IconButton>
-      </Box>
-      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-        <FormControl sx={{ minWidth: 120 }}>
-          <InputLabel>Filter By Author</InputLabel>
-          <Select
-            multiple
-            value={selectedAuthors}
-            onChange={(e) => setSelectedAuthors(e.target.value)}
-            input={<OutlinedInput label="Filter By Author" />}
-            renderValue={(selected) => selected.join(', ')}
-          >
-            {[...new Set(books.map(book => book.author))].map((author) => (
-              <MenuItem key={author} value={author}>
-                {author}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl sx={{ minWidth: 120 }}>
-          <InputLabel>Filter By Category</InputLabel>
-          <Select
-            multiple
-            value={selectedCategories}
-            onChange={(e) => setSelectedCategories(e.target.value)}
-            input={<OutlinedInput label="Filter By Category" />}
-            renderValue={(selected) => selected.join(', ')}
-          >
-            {categories.map((category) => (
-              <MenuItem key={category} value={category}>
-                {category}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl sx={{ minWidth: 120 }}>
-          <InputLabel>Filter By Collection</InputLabel>
-          <Select
-            multiple
-            value={selectedCollections}
-            onChange={(e) => setSelectedCollections(e.target.value)}
-            input={<OutlinedInput label="Filter By Collection" />}
-            renderValue={(selected) => selected.join(', ')}
-          >
-            {[...new Set(books.map(book => book.collection))].map((collection) => (
-              <MenuItem key={collection} value={collection}>
-                {collection}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Box>
-      <ToggleButtonGroup
-        value={view}
-        exclusive
-        onChange={(e, newView) => setView(newView)}
-        sx={{ mb: 3 }}
-      >
-        <ToggleButton value="list">List View</ToggleButton>
-        <ToggleButton value="table">Table View</ToggleButton>
-      </ToggleButtonGroup>
-      {view === 'list' ? (
-        <Card sx={{ borderRadius: 2, boxShadow: 3 }}>
-          {loading ? (
-            <CircularProgress sx={{ display: 'block', margin: '20px auto' }} />
-          ) : (
-            <List>
-              {filteredBooks.map((book, index) => (
-                <React.Fragment key={book.id}>
-                  <ListItem>
-                    <Checkbox
-                      checked={selectedBooks.includes(book.id)}
-                      onChange={() => handleSelectBook(book.id)}
-                    />
-                    <ListItemText
-                      primary={book.title}
-                      secondary={`Author: ${book.author} | Categories: ${book.category.join(', ')} | Added: ${book.addDate.toDate().toLocaleDateString()}`}
-                    />
-                    <IconButton onClick={() => { setSelectedBook(book); setOpen(true); }}>
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton onClick={() => handleDelete(book.id)}>
-                      <DeleteIcon />
-                    </IconButton>
-                  </ListItem>
-                  {index < filteredBooks.length - 1 && <Divider />}
-                </React.Fragment>
-              ))}
-            </List>
-          )}
-        </Card>
-      ) : (
-        <Paper style={{ height: 400, width: '100%' }}>
-          <TableVirtuoso
-            data={filteredBooks}
-            components={VirtuosoTableComponents}
-            fixedHeaderContent={fixedHeaderContent}
-            itemContent={rowContent}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          Books Management
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <TextField
+            placeholder="Search books..."
+            variant="outlined"
+            size="small"
+            value={searchTerm}
+            onChange={handleSearch}
+            sx={{ flexGrow: 1 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
           />
-        </Paper>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="Refresh">
+              <IconButton onClick={fetchBooks}>
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Toggle View">
+              <IconButton onClick={() => setView(view === 'grid' ? 'list' : 'grid')}>
+                {view === 'grid' ? <ViewListIcon /> : <GridViewIcon />}
+              </IconButton>
+            </Tooltip>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => { setSelectedBook(null); setOpen(true); }}
+            >
+              Add Book
+            </Button>
+          </Box>
+        </Box>
+      </Box>
+
+      <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+        <Button
+          variant="outlined"
+          startIcon={<FilterListIcon />}
+          onClick={() => setShowFilters(!showFilters)}
+        >
+          Filters
+        </Button>
+        {selectedBooks.length > 0 && (
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => setDeleteDialogOpen(true)}
+          >
+            Delete Selected ({selectedBooks.length})
+          </Button>
+        )}
+      </Box>
+
+      {showFilters && (
+        <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <FormControl sx={{ minWidth: 200 }}>
+            <InputLabel>Author</InputLabel>
+            <Select
+              multiple
+              value={selectedAuthors}
+              onChange={(e) => setSelectedAuthors(e.target.value)}
+              input={<OutlinedInput label="Author" />}
+              renderValue={(selected) => selected.join(', ')}
+              size="small"
+            >
+              {[...new Set(books.map(book => book.author))].map((author) => (
+                <MenuItem key={author} value={author}>
+                  <Checkbox checked={selectedAuthors.includes(author)} />
+                  {author}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl sx={{ minWidth: 200 }}>
+            <InputLabel>Category</InputLabel>
+            <Select
+              multiple
+              value={selectedCategories}
+              onChange={(e) => setSelectedCategories(e.target.value)}
+              input={<OutlinedInput label="Category" />}
+              renderValue={(selected) => selected.join(', ')}
+              size="small"
+            >
+              {categories.map((category) => (
+                <MenuItem key={category} value={category}>
+                  <Checkbox checked={selectedCategories.includes(category)} />
+                  {category}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
       )}
-      <BookForm open={open} setOpen={setOpen} fetchBooks={fetchBooks} book={selectedBook} />
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        filteredBooks.length === 0 ? (
+          <Paper sx={{ p: 4, textAlign: 'center' }}>
+            <Typography color="textSecondary">
+              No books found. Try adjusting your search or filters.
+            </Typography>
+          </Paper>
+        ) : (
+          view === 'grid' ? <GridView /> : <ListView />
+        )
+      )}
+
+      <BookForm 
+        open={open} 
+        setOpen={setOpen}
+        book={selectedBook}
+        fetchBooks={fetchBooks}  // Updated prop name
+      />
+
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          Are you sure you want to delete {selectedBooks.length} selected book(s)?
+          This action cannot be undone.
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleDelete} color="error" variant="contained">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+      >
+        <Alert 
+          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
