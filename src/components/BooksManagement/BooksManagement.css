@@ -1,31 +1,80 @@
 /* BooksManagement.css */
 .books-management {
-    padding: 2rem;
+  padding: 1rem;
+  max-width: 100%;
+  overflow-x: hidden; /* Prevent horizontal overflow */
+}
+
+.books-management h1 {
+  margin-bottom: 1rem;
+  font-size: 1.5rem; /* Smaller font size for mobile */
+}
+
+.book-card {
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.book-card h2 {
+  margin-bottom: 0.5rem;
+}
+
+/* Media Queries for Mobile */
+@media (max-width: 768px) {
+  .books-management {
+    padding: 0.5rem;
   }
-  
-  .books-management h1 {
-    margin-bottom: 1rem;
-  }
-  
+
   .book-card {
-    background-color: #ffffff;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    padding: 1rem;
-    margin-bottom: 1rem;
+    padding: 0.5rem;
   }
-  
-  .book-card h2 {
-    margin-bottom: 0.5rem;
+
+  .MuiTableContainer-root {
+    overflow-x: auto;
   }
-  
-  /* Media Queries for Responsiveness */
-  @media (max-width: 768px) {
-    .books-management {
-      padding: 1rem;
-    }
-  
-    .book-card {
-      padding: 0.5rem;
-    }
+
+  .MuiTableCell-root {
+    padding: 8px;
+    font-size: 0.875rem; /* Smaller font size for table cells */
   }
+
+  .MuiTypography-h4 {
+    font-size: 1.25rem; /* Smaller heading size for mobile */
+  }
+
+  .MuiTypography-h5 {
+    font-size: 1rem;
+  }
+
+  .MuiButton-root {
+    font-size: 0.75rem; /* Smaller button text */
+    padding: 4px 8px; /* Smaller button padding */
+  }
+
+  .MuiTextField-root {
+    width: 100%; /* Full width for search bar on mobile */
+  }
+
+  .MuiGrid-container {
+    flex-direction: column; /* Stack grid items vertically on mobile */
+  }
+
+  .MuiGrid-item {
+    width: 100%; /* Full width for grid items on mobile */
+  }
+
+  .MuiFormControl-root {
+    width: 100%; /* Full width for filters on mobile */
+  }
+
+  .MuiSelect-select {
+    font-size: 0.875rem; /* Smaller font size for select dropdown */
+  }
+
+  .MuiChip-root {
+    font-size: 0.75rem; /* Smaller font size for chips */
+  }
+}

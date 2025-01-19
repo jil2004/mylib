@@ -18,7 +18,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 
 const Sidebar = ({ darkMode }) => {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const location = useLocation(); // Get the current route location
 
   const toggleDrawer = () => {

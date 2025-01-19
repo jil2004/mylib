@@ -7,10 +7,6 @@ import {
   Typography,
   Box,
   TextField,
-  List,
-  ListItem,
-  ListItemText,
-  Divider,
   IconButton,
   Card,
   CircularProgress,
@@ -29,27 +25,23 @@ import {
   TableHead,
   TableRow,
   TableSortLabel,
-  ToggleButton,
-  ToggleButtonGroup,
-  InputAdornment,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Grid,
   Tooltip,
   Alert,
   Snackbar,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  Grid,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  styled,
+  InputAdornment
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import SortIcon from '@mui/icons-material/Sort';
 import GridViewIcon from '@mui/icons-material/GridView';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -73,6 +65,42 @@ const categories = [
   'Reference & Dictionaries',
   'Children Book',
 ];
+
+// Styled components for mobile responsiveness
+const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
+  maxWidth: '100%',
+  overflowX: 'auto',
+  [theme.breakpoints.down('sm')]: {
+    marginLeft: '-16px', // Adjust for padding
+    marginRight: '-16px', // Adjust for padding
+  },
+}));
+
+const StyledTableCell = styled(TableCell)(({ theme }) => ({
+  [theme.breakpoints.down('sm')]: {
+    padding: '8px',
+    fontSize: '0.875rem',
+  },
+}));
+
+const StyledButton = styled(Button)(({ theme }) => ({
+  [theme.breakpoints.down('sm')]: {
+    fontSize: '0.75rem',
+    padding: '4px 8px',
+  },
+}));
+
+const StyledTextField = styled(TextField)(({ theme }) => ({
+  [theme.breakpoints.down('sm')]: {
+    width: '100%',
+  },
+}));
+
+const StyledFormControl = styled(FormControl)(({ theme }) => ({
+  [theme.breakpoints.down('sm')]: {
+    width: '100%',
+  },
+}));
 
 const BooksManagement = () => {
   const theme = useTheme();
@@ -254,7 +282,7 @@ const BooksManagement = () => {
   );
 
   const ListView = () => (
-    <TableContainer component={Paper}>
+    <StyledTableContainer component={Paper}>
       <Table>
         <TableHead>
           <TableRow>
@@ -271,7 +299,7 @@ const BooksManagement = () => {
                 }}
               />
             </TableCell>
-            <TableCell>
+            <StyledTableCell>
               <TableSortLabel
                 active={sortField === 'title'}
                 direction={sortOrder}
@@ -279,10 +307,10 @@ const BooksManagement = () => {
               >
                 Title
               </TableSortLabel>
-            </TableCell>
-            <TableCell>Author</TableCell>
-            <TableCell>Categories</TableCell>
-            <TableCell>
+            </StyledTableCell>
+            <StyledTableCell>Author</StyledTableCell>
+            <StyledTableCell>Categories</StyledTableCell>
+            <StyledTableCell>
               <TableSortLabel
                 active={sortField === 'addDate'}
                 direction={sortOrder}
@@ -290,8 +318,8 @@ const BooksManagement = () => {
               >
                 Added Date
               </TableSortLabel>
-            </TableCell>
-            <TableCell align="right">Actions</TableCell>
+            </StyledTableCell>
+            <StyledTableCell align="right">Actions</StyledTableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -303,36 +331,36 @@ const BooksManagement = () => {
                   onChange={() => handleSelectBook(book.id)}
                 />
               </TableCell>
-              <TableCell>{book.title}</TableCell>
-              <TableCell>{book.author}</TableCell>
-              <TableCell>
+              <StyledTableCell>{book.title}</StyledTableCell>
+              <StyledTableCell>{book.author}</StyledTableCell>
+              <StyledTableCell>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                   {book.category.map((cat) => (
                     <Chip key={cat} label={cat} size="small" />
                   ))}
                 </Box>
-              </TableCell>
-              <TableCell>{book.addDate.toDate().toLocaleDateString()}</TableCell>
-              <TableCell align="right">
+              </StyledTableCell>
+              <StyledTableCell>{book.addDate.toDate().toLocaleDateString()}</StyledTableCell>
+              <StyledTableCell align="right">
                 <IconButton onClick={() => { setSelectedBook(book); setOpen(true); }}>
                   <EditIcon />
                 </IconButton>
-              </TableCell>
+              </StyledTableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
-    </TableContainer>
+    </StyledTableContainer>
   );
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: isMobile ? 1 : 3, maxWidth: '100%', overflowX: 'hidden' }}>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" gutterBottom>
+        <Typography variant={isMobile ? 'h5' : 'h4'} gutterBottom>
           Books Management
         </Typography>
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-          <TextField
+          <StyledTextField
             placeholder="Search books..."
             variant="outlined"
             size="small"
@@ -358,40 +386,40 @@ const BooksManagement = () => {
                 {view === 'grid' ? <ViewListIcon /> : <GridViewIcon />}
               </IconButton>
             </Tooltip>
-            <Button
+            <StyledButton
               variant="contained"
               startIcon={<AddIcon />}
               onClick={() => { setSelectedBook(null); setOpen(true); }}
             >
               Add Book
-            </Button>
+            </StyledButton>
           </Box>
         </Box>
       </Box>
 
       <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        <Button
+        <StyledButton
           variant="outlined"
           startIcon={<FilterListIcon />}
           onClick={() => setShowFilters(!showFilters)}
         >
           Filters
-        </Button>
+        </StyledButton>
         {selectedBooks.length > 0 && (
-          <Button
+          <StyledButton
             variant="contained"
             color="error"
             startIcon={<DeleteIcon />}
             onClick={() => setDeleteDialogOpen(true)}
           >
             Delete Selected ({selectedBooks.length})
-          </Button>
+          </StyledButton>
         )}
       </Box>
 
       {showFilters && (
         <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-          <FormControl sx={{ minWidth: 200 }}>
+          <StyledFormControl>
             <InputLabel>Author</InputLabel>
             <Select
               multiple
@@ -408,8 +436,8 @@ const BooksManagement = () => {
                 </MenuItem>
               ))}
             </Select>
-          </FormControl>
-          <FormControl sx={{ minWidth: 200 }}>
+          </StyledFormControl>
+          <StyledFormControl>
             <InputLabel>Category</InputLabel>
             <Select
               multiple
@@ -426,7 +454,7 @@ const BooksManagement = () => {
                 </MenuItem>
               ))}
             </Select>
-          </FormControl>
+          </StyledFormControl>
         </Box>
       )}
 
@@ -453,7 +481,11 @@ const BooksManagement = () => {
         fetchBooks={fetchBooks}  // Updated prop name
       />
 
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        fullScreen={isMobile} // Make the dialog fullscreen on mobile
+      >
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           Are you sure you want to delete {selectedBooks.length} selected book(s)?
